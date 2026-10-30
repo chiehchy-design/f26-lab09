@@ -74,10 +74,39 @@ about what is stored or how it is queried lives in `storage`, tokens live in
    `new AvailabilityService(stores.bookings(), policy)` and hands it to
    `RoomsHandler`. `AvailabilityService` imports `BookingStore` and nothing
    from `policy/` besides `BookingPolicy`. It never calls `ConflictChecker`.
+   So my sketch is right, and `ARCHITECTURE.md` is missing this path.
 2. I grepped `src/main` for `overlaps` and `findConflicts`. The comparison is
    in `InMemoryBookingStore.java`, and `storage/.../FindConflictsTest.java`
    pins it as storage behavior. Right now it gives the same answer as
    `overlaps`, but nothing ties the two together, so they can drift apart.
+   So my sketch is right, and the "only overlap implementation" claim in
+   `ARCHITECTURE.md` and `AGENTS.md` is false.
+
+
+**Tracing the two paths.**
+
+Booking, `POST /bookings`:
+
+1. `HttpApiServer.serve` → `Router.lookup` → `BookingsHandler.create`.
+2. `RequestAuth.require` → `AuthorizationService` → `TokenService.authenticate`.
+   An unknown token stops here with a 401.
+3. The handler builds a `BookingRequest` for the token's user and calls
+   `BookingService.requestBooking`.
+4. `requestBooking` checks that the room and user exist, runs
+   `BookingRules.checkRequest`, then the user's own limits, then
+   `bookings.findActiveByRoom` + `ConflictChecker.hasConflict`.
+5. Free: `bookings.save` puts it in `InMemoryBookingStore`, and `publish` sends
+   `booking-created` to `EventLogPublisher` (in-memory log, then
+   `NotificationService`). The handler returns 201. Taken: `joinWaitlist` →
+   `waitlist.save`, and the handler returns 202.
+
+Availability, `GET /rooms/{roomId}/availability?date=...`:
+
+1. `Router.lookup` → `RoomsHandler.availability` → `RoomCatalog.find`.
+2. `AvailabilityService.freeOnDate` → `openingWindow` → `freeIntervals` →
+   `busyIntervals` → `InMemoryBookingStore.findConflicts`.
+3. The gaps between those bookings become the `free` list in the response.
+   `BookingService` and `ConflictChecker` are never touched.
 
 ---
 
