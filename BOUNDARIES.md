@@ -67,13 +67,6 @@ about what is stored or how it is queried lives in `storage`, tokens live in
    the only overlap implementation. `InMemoryBookingStore.findConflicts`
    writes its own (`start.isBefore(windowEnd) && windowStart.isBefore(end)`),
    and availability depends on it.
-3. `ARCHITECTURE.md` says the event log is "the one thing that can outlive a
-   process". For the HTTP server it can't: `CampusReservePlatform` builds
-   `StoreRegistry.inMemory()`, so booking events made over HTTP only ever go
-   into a list in memory.
-4. The repo's drawing shows one platform. Running it as copies gives each
-   process its own stores and its own `TokenService`, which is the whole of
-   Milestone 2. I drew that in. The repo doesn't.
 
 **How you decided which one is right.**
 
@@ -85,11 +78,6 @@ about what is stored or how it is queried lives in `storage`, tokens live in
    in `InMemoryBookingStore.java`, and `storage/.../FindConflictsTest.java`
    pins it as storage behavior. Right now it gives the same answer as
    `overlaps`, but nothing ties the two together, so they can drift apart.
-3. I grepped for callers of `withEventLogFile` and `JsonlFileEventLogWriter(`.
-   Outside tests there are none. Both entry points call
-   `StoreRegistry.inMemory()` (`CampusReservePlatform.java:44`,
-   `CliContext.java:54`).
-4. Checked at runtime: the two scripts in Milestone 2.
 
 ---
 
